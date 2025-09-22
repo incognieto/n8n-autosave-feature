@@ -200,6 +200,12 @@ const cacheCredentials = (form: EmailOrLdapLoginIdAndPassword) => {
 
 <template>
 	<div>
+		<!-- Hello World Banner -->
+		<div class="hello-world-banner">
+			<h1>🌍 Hello World - Custom N8N!</h1>
+			<p>Welcome to the modified n8n workflow automation platform</p>
+		</div>
+
 		<AuthView
 			v-if="!showMfaView"
 			:form="formConfig"
@@ -217,3 +223,29 @@ const cacheCredentials = (form: EmailOrLdapLoginIdAndPassword) => {
 		/>
 	</div>
 </template>
+
+<style lang="scss" scoped>
+.hello-world-banner {
+	text-align: center;
+	margin-bottom: 2rem;
+	padding: 1rem;
+	background: linear-gradient(135deg, #ff6d5a 0%, #ff9500 100%);
+	color: white;
+	border-radius: 8px;
+	margin: 0 auto 2rem auto;
+	max-width: 500px;
+	box-shadow: 0 4px 12px rgba(255, 109, 90, 0.3);
+
+	h1 {
+		margin: 0 0 0.5rem 0;
+		font-size: 1.8rem;
+		font-weight: bold;
+	}
+
+	p {
+		margin: 0;
+		font-size: 1rem;
+		opacity: 0.9;
+	}
+}
+</style>

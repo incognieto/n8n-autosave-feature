@@ -265,6 +265,7 @@ const { applyExecutionData } = useExecutionDebugging();
 useClipboard({ onPaste: onClipboardPaste });
 useKeybindings({
 	ctrl_alt_o: () => uiStore.openModal(ABOUT_MODAL_KEY),
+	ctrl_alt_s: () => toggleAutoSave(),
 });
 
 const canvasRef = useTemplateRef('canvas');
@@ -893,6 +894,153 @@ async function onSaveWorkflow() {
 	const saved = await workflowSaving.saveCurrentWorkflow();
 	if (saved) {
 		canvasEventBus.emit('saved:workflow');
+	}
+}
+
+// Auto-save functionality
+const isAutoSaving = ref(false);
+const lastAutoSaveTime = ref<Date | null>(null);
+const isAutoSaveEnabled = ref(true);
+
+async function autoSaveWorkflow() {
+	// Don't auto-save if disabled
+	if (!isAutoSaveEnabled.value) {
+		return;
+	}
+
+	// Prevent multiple simultaneous auto-saves
+	if (isAutoSaving.value) {
+		return;
+	}
+
+	const workflowIsSaved = !uiStore.stateIsDirty && !workflowsStore.isNewWorkflow;
+	const workflowIsArchived = workflowsStore.workflow.isArchived;
+
+	// Don't auto-save if workflow is already saved or archived
+	if (workflowIsSaved || workflowIsArchived) {
+		return;
+	}
+
+	isAutoSaving.value = true;
+
+	try {
+		const saved = await workflowSaving.saveCurrentWorkflow();
+		if (saved) {
+			lastAutoSaveTime.value = new Date();
+			canvasEventBus.emit('saved:workflow');
+
+			// Show subtle notification
+			toast.showMessage({
+				title: '💾 Auto-saved',
+				type: 'success',
+				duration: 2000,
+			});
+		}
+	} catch (error) {
+		console.error('Auto-save failed:', error);
+	} finally {
+		isAutoSaving.value = false;
+	}
+}
+
+function toggleAutoSave() {
+	isAutoSaveEnabled.value = !isAutoSaveEnabled.value;
+
+	if (isAutoSaveEnabled.value) {
+		startAutoSave();
+		toast.showMessage({
+			title: '✅ Auto-save enabled',
+			type: 'success',
+			duration: 3000,
+		});
+	} else {
+		stopAutoSave();
+		toast.showMessage({
+			title: '⏸️ Auto-save disabled',
+			type: 'info',
+			duration: 3000,
+		});
+	}
+}
+
+// Watch for workflow changes and auto-save
+let autoSaveTimeout: NodeJS.Timeout | null = null;
+let autoSaveWatchers: Array<() => void> = [];
+
+function triggerAutoSave() {
+	// Don't trigger auto-save if disabled
+	if (!isAutoSaveEnabled.value) {
+		return;
+	}
+
+	// Debounce auto-save to avoid too frequent saves (wait 2 seconds after last change)
+	if (autoSaveTimeout) {
+		clearTimeout(autoSaveTimeout);
+	}
+
+	autoSaveTimeout = setTimeout(() => {
+		void autoSaveWorkflow();
+	}, 2000); // 2 seconds debounce
+}
+
+function startAutoSave() {
+	// Don't start auto-save watchers if disabled
+	if (!isAutoSaveEnabled.value) {
+		return;
+	}
+
+	// Clear any existing watchers first
+	stopAutoSave();
+
+	// Watch for state changes to trigger auto-save
+	const stateWatcher = watch(
+		() => uiStore.stateIsDirty,
+		(isDirty) => {
+			if (isDirty) {
+				triggerAutoSave();
+			}
+		},
+		{ immediate: false },
+	);
+
+	// Also watch for workflow changes
+	const workflowWatcher = watch(
+		() => workflowsStore.workflow,
+		() => {
+			if (uiStore.stateIsDirty) {
+				triggerAutoSave();
+			}
+		},
+		{ deep: true, immediate: false },
+	);
+
+	// Store watchers so we can stop them later
+	autoSaveWatchers = [stateWatcher, workflowWatcher];
+}
+
+function stopAutoSave() {
+	// Clear timeout
+	if (autoSaveTimeout) {
+		clearTimeout(autoSaveTimeout);
+		autoSaveTimeout = null;
+	}
+
+	// Stop all watchers
+	autoSaveWatchers.forEach((watcher) => watcher());
+	autoSaveWatchers = [];
+}
+
+function formatLastSaveTime(date: Date): string {
+	const now = new Date();
+	const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+	if (diffInSeconds < 60) {
+		return `${diffInSeconds}s ago`;
+	} else if (diffInSeconds < 3600) {
+		const minutes = Math.floor(diffInSeconds / 60);
+		return `${minutes}m ago`;
+	} else {
+		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 	}
 }
 
@@ -2018,6 +2166,11 @@ onMounted(() => {
 				}, 500);
 
 				emitPostMessageReady();
+
+				// Start auto-save after everything is loaded (only if enabled)
+				if (isAutoSaveEnabled.value) {
+					startAutoSave();
+				}
 			});
 
 		void usersStore.showPersonalizationSurvey();
@@ -2044,6 +2197,7 @@ onDeactivated(() => {
 });
 
 onBeforeUnmount(() => {
+	stopAutoSave(); // Stop auto-save when leaving the view
 	removeSourceControlEventBindings();
 	removePostMessageEventBindings();
 	removeWorkflowSavedEventBindings();
@@ -2180,6 +2334,33 @@ onBeforeUnmount(() => {
 				@stop="builderStore.stopStreaming"
 			/>
 
+			<!-- Auto-save Controls -->
+			<div v-if="!isCanvasReadOnly" :class="$style.autoSaveControls">
+				<div :class="$style.autoSaveToggle" :title="'Toggle auto-save (Ctrl+Alt+S)'">
+					<label :class="$style.autoSaveLabel">
+						<input
+							type="checkbox"
+							:checked="isAutoSaveEnabled"
+							@change="toggleAutoSave"
+							:class="$style.autoSaveCheckbox"
+						/>
+						<span :class="$style.autoSaveToggleText">Auto-save</span>
+					</label>
+				</div>
+
+				<!-- Auto-save Status Indicator -->
+				<div v-if="isAutoSaveEnabled && lastAutoSaveTime" :class="$style.autoSaveIndicator">
+					<span :class="$style.autoSaveIcon">💾</span>
+					<span :class="$style.autoSaveText">
+						{{
+							isAutoSaving
+								? 'Auto-saving...'
+								: `Last saved: ${formatLastSaveTime(lastAutoSaveTime)}`
+						}}
+					</span>
+				</div>
+			</div>
+
 			<Suspense>
 				<LazyNodeCreation
 					v-if="!isCanvasReadOnly"
@@ -2297,5 +2478,72 @@ onBeforeUnmount(() => {
 	top: 50%;
 	transform: translate(-50%, -50%);
 	z-index: 10;
+}
+
+.autoSaveControls {
+	position: absolute;
+	top: var(--spacing-s);
+	right: var(--spacing-s);
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: var(--spacing-2xs);
+	z-index: 10;
+}
+
+.autoSaveToggle {
+	background: rgba(255, 255, 255, 0.95);
+	border: 1px solid var(--color-foreground-light);
+	border-radius: var(--border-radius-base);
+	padding: var(--spacing-2xs) var(--spacing-xs);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+	backdrop-filter: blur(4px);
+}
+
+.autoSaveLabel {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-3xs);
+	cursor: pointer;
+	font-size: var(--font-size-2xs);
+	font-weight: 500;
+	color: var(--color-text-base);
+	margin: 0;
+}
+
+.autoSaveCheckbox {
+	width: 14px;
+	height: 14px;
+	accent-color: var(--color-primary);
+	cursor: pointer;
+}
+
+.autoSaveToggleText {
+	user-select: none;
+	white-space: nowrap;
+}
+
+.autoSaveIndicator {
+	background: rgba(255, 255, 255, 0.9);
+	border: 1px solid var(--color-foreground-light);
+	border-radius: var(--border-radius-base);
+	padding: var(--spacing-2xs) var(--spacing-xs);
+	font-size: var(--font-size-2xs);
+	color: var(--color-text-base);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-3xs);
+	backdrop-filter: blur(4px);
+	transition: opacity 0.2s ease;
+
+	.autoSaveIcon {
+		font-size: 12px;
+	}
+
+	.autoSaveText {
+		white-space: nowrap;
+		font-weight: 500;
+	}
 }
 </style>
