@@ -14,6 +14,7 @@ import {
 	onBeforeUnmount,
 	useTemplateRef,
 } from 'vue';
+import { useLocalStorage } from '@vueuse/core';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import WorkflowCanvas from '@/components/canvas/WorkflowCanvas.vue';
 import FocusPanel from '@/components/FocusPanel.vue';
@@ -69,6 +70,7 @@ import {
 	NDV_UI_OVERHAUL_EXPERIMENT,
 	WORKFLOW_SETTINGS_MODAL_KEY,
 	ABOUT_MODAL_KEY,
+	LOCAL_STORAGE_AUTOSAVE_ENABLED,
 } from '@/constants';
 import { useSourceControlStore } from '@/stores/sourceControl.store';
 import { useNodeCreatorStore } from '@/stores/nodeCreator.store';
@@ -900,7 +902,7 @@ async function onSaveWorkflow() {
 // Auto-save functionality
 const isAutoSaving = ref(false);
 const lastAutoSaveTime = ref<Date | null>(null);
-const isAutoSaveEnabled = ref(true);
+const isAutoSaveEnabled = useLocalStorage(LOCAL_STORAGE_AUTOSAVE_ENABLED, true);
 
 async function autoSaveWorkflow() {
 	// Don't auto-save if disabled
@@ -948,18 +950,8 @@ function toggleAutoSave() {
 
 	if (isAutoSaveEnabled.value) {
 		startAutoSave();
-		toast.showMessage({
-			title: '✅ Auto-save enabled',
-			type: 'success',
-			duration: 3000,
-		});
 	} else {
 		stopAutoSave();
-		toast.showMessage({
-			title: '⏸️ Auto-save disabled',
-			type: 'info',
-			duration: 3000,
-		});
 	}
 }
 
@@ -2334,33 +2326,6 @@ onBeforeUnmount(() => {
 				@stop="builderStore.stopStreaming"
 			/>
 
-			<!-- Auto-save Controls -->
-			<div v-if="!isCanvasReadOnly" :class="$style.autoSaveControls">
-				<div :class="$style.autoSaveToggle" :title="'Toggle auto-save (Ctrl+Alt+S)'">
-					<label :class="$style.autoSaveLabel">
-						<input
-							type="checkbox"
-							:checked="isAutoSaveEnabled"
-							@change="toggleAutoSave"
-							:class="$style.autoSaveCheckbox"
-						/>
-						<span :class="$style.autoSaveToggleText">Auto-save</span>
-					</label>
-				</div>
-
-				<!-- Auto-save Status Indicator -->
-				<div v-if="isAutoSaveEnabled && lastAutoSaveTime" :class="$style.autoSaveIndicator">
-					<span :class="$style.autoSaveIcon">💾</span>
-					<span :class="$style.autoSaveText">
-						{{
-							isAutoSaving
-								? 'Auto-saving...'
-								: `Last saved: ${formatLastSaveTime(lastAutoSaveTime)}`
-						}}
-					</span>
-				</div>
-			</div>
-
 			<Suspense>
 				<LazyNodeCreation
 					v-if="!isCanvasReadOnly"
@@ -2478,72 +2443,5 @@ onBeforeUnmount(() => {
 	top: 50%;
 	transform: translate(-50%, -50%);
 	z-index: 10;
-}
-
-.autoSaveControls {
-	position: absolute;
-	top: var(--spacing-s);
-	right: var(--spacing-s);
-	display: flex;
-	flex-direction: column;
-	align-items: flex-end;
-	gap: var(--spacing-2xs);
-	z-index: 10;
-}
-
-.autoSaveToggle {
-	background: rgba(255, 255, 255, 0.95);
-	border: 1px solid var(--color-foreground-light);
-	border-radius: var(--border-radius-base);
-	padding: var(--spacing-2xs) var(--spacing-xs);
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-	backdrop-filter: blur(4px);
-}
-
-.autoSaveLabel {
-	display: flex;
-	align-items: center;
-	gap: var(--spacing-3xs);
-	cursor: pointer;
-	font-size: var(--font-size-2xs);
-	font-weight: 500;
-	color: var(--color-text-base);
-	margin: 0;
-}
-
-.autoSaveCheckbox {
-	width: 14px;
-	height: 14px;
-	accent-color: var(--color-primary);
-	cursor: pointer;
-}
-
-.autoSaveToggleText {
-	user-select: none;
-	white-space: nowrap;
-}
-
-.autoSaveIndicator {
-	background: rgba(255, 255, 255, 0.9);
-	border: 1px solid var(--color-foreground-light);
-	border-radius: var(--border-radius-base);
-	padding: var(--spacing-2xs) var(--spacing-xs);
-	font-size: var(--font-size-2xs);
-	color: var(--color-text-base);
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-	display: flex;
-	align-items: center;
-	gap: var(--spacing-3xs);
-	backdrop-filter: blur(4px);
-	transition: opacity 0.2s ease;
-
-	.autoSaveIcon {
-		font-size: 12px;
-	}
-
-	.autoSaveText {
-		white-space: nowrap;
-		font-weight: 500;
-	}
 }
 </style>

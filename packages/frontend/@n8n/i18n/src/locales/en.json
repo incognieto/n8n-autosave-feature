@@ -3181,6 +3181,8 @@
 	"settings.personal.mfa.section.title": "Two-factor authentication (2FA)",
 	"settings.personal.personalisation": "Personalisation",
 	"settings.personal.theme": "Theme",
+	"settings.personal.autoSave": "Auto-save workflows",
+	"settings.personal.autoSave.description": "Automatically save workflow changes every 2 seconds",
 	"settings.personal.theme.systemDefault": "System default",
 	"settings.personal.theme.light": "Light theme",
 	"settings.personal.theme.dark": "Dark theme",

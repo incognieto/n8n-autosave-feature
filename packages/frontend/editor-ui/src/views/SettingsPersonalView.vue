@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { ROLE, type Role } from '@n8n/api-types';
 import { useI18n } from '@n8n/i18n';
+import { useLocalStorage } from '@vueuse/core';
 import { useToast } from '@/composables/useToast';
 import { useDocumentTitle } from '@/composables/useDocumentTitle';
 import type { IFormInputs, ThemeOption } from '@/Interface';
@@ -12,6 +13,7 @@ import {
 	MFA_DOCS_URL,
 	MFA_SETUP_MODAL_KEY,
 	PROMPT_MFA_CODE_MODAL_KEY,
+	LOCAL_STORAGE_AUTOSAVE_ENABLED,
 } from '@/constants';
 import { useUIStore } from '@/stores/ui.store';
 import { useUsersStore } from '@/stores/users.store';
@@ -53,6 +55,8 @@ const formInputs = ref<null | IFormInputs>(null);
 const formBus = createFormEventBus();
 const readyToSubmit = ref(false);
 const currentSelectedTheme = ref(useUIStore().theme);
+const isAutoSaveEnabled = useLocalStorage(LOCAL_STORAGE_AUTOSAVE_ENABLED, true);
+const initialAutoSaveValue = ref(isAutoSaveEnabled.value);
 const themeOptions = ref<Array<{ name: ThemeOption; label: BaseTextKey }>>([
 	{
 		name: 'system',
@@ -102,7 +106,10 @@ const isMfaFeatureEnabled = computed((): boolean => {
 });
 
 const hasAnyPersonalisationChanges = computed((): boolean => {
-	return currentSelectedTheme.value !== uiStore.theme;
+	return (
+		currentSelectedTheme.value !== uiStore.theme ||
+		isAutoSaveEnabled.value !== initialAutoSaveValue.value
+	);
 });
 
 const hasAnyChanges = computed(() => {
@@ -138,6 +145,8 @@ const currentUserRole = computed<RoleContent>(() => roles.value[usersStore.globa
 
 onMounted(() => {
 	documentTitle.set(i18n.baseText('settings.personal.personalSettings'));
+	// Set initial auto-save value for change detection
+	initialAutoSaveValue.value = isAutoSaveEnabled.value;
 	formInputs.value = [
 		{
 			name: 'firstName',
@@ -262,6 +271,8 @@ async function updatePersonalisationSettings() {
 	}
 
 	uiStore.setTheme(currentSelectedTheme.value);
+	// Update initial auto-save value to current value after saving
+	initialAutoSaveValue.value = isAutoSaveEnabled.value;
 }
 
 function onSaveClick() {
@@ -435,6 +446,17 @@ onBeforeUnmount(() => {
 					</n8n-select>
 				</n8n-input-label>
 			</div>
+			<div class="mt-s">
+				<div :class="$style.autoSaveSetting">
+					<div :class="$style.autoSaveHeader">
+						<n8n-text bold>{{ i18n.baseText('settings.personal.autoSave') }}</n8n-text>
+						<el-switch v-model="isAutoSaveEnabled" size="large" data-test-id="auto-save-switch" />
+					</div>
+					<n8n-text size="small" color="text-light" :class="$style.autoSaveDescription">
+						{{ i18n.baseText('settings.personal.autoSave.description') }}
+					</n8n-text>
+				</div>
+			</div>
 		</div>
 		<div>
 			<n8n-button
@@ -497,6 +519,25 @@ onBeforeUnmount(() => {
 	> span {
 		font-weight: var(--font-weight-bold);
 	}
+}
+
+.autoSaveSetting {
+	padding: var(--spacing-s);
+	border: 1px solid var(--color-foreground-light);
+	border-radius: var(--border-radius-base);
+	background-color: var(--color-background-xlight);
+}
+
+.autoSaveHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: var(--spacing-2xs);
+}
+
+.autoSaveDescription {
+	margin: 0;
+	font-style: italic;
 }
 
 .button {
