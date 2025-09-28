@@ -4,13 +4,88 @@
 		<meta charset="utf-8" />
 		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 		<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+		<meta name="description" content="n8n is a workflow automation platform that connects APIs, databases, and services without code. Build powerful automations for technical teams.">
+		<meta name="keywords" content="workflow automation, no-code, API integration, task automation, business process automation">
+		
+		<!-- Open Graph / Facebook -->
+		<meta property="og:type" content="website">
+		<meta property="og:url" content="https://n8n.io/">
+		<meta property="og:title" content="n8n - Workflow Automation Platform">
+		<meta property="og:description" content="Connect APIs, databases, and services without code. Build powerful automations for technical teams.">
+		<meta property="og:image" content="/static/og_image.png">
+		
+		<!-- Twitter -->
+		<meta property="twitter:card" content="summary_large_image">
+		<meta property="twitter:url" content="https://n8n.io/">
+		<meta property="twitter:title" content="n8n - Workflow Automation Platform">
+		<meta property="twitter:description" content="Connect APIs, databases, and services without code. Build powerful automations for technical teams.">
+		<meta property="twitter:image" content="/static/og_image.png">
+		
 		<link rel="icon" href="/favicon.ico" />
+		
+		<!-- Preload critical resources -->
+		<link rel="preload" href="/src/main.ts" as="script">
+		<link rel="dns-prefetch" href="//fonts.googleapis.com">
+		<link rel="dns-prefetch" href="//api.fonts.com">
+		
 		%CONFIG_TAGS%
-		<link rel="stylesheet" href="/{{BASE_PATH}}/static/prefers-color-scheme.css">
+		
+		<!-- Inline critical CSS for faster rendering -->
+		<style>
+		body {
+			margin: 0;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+			line-height: 1.6;
+			background-color: #ffffff;
+		}
+		
+		@media (prefers-color-scheme: dark) {
+			body {
+				background-color: rgb(45, 46, 46);
+				color: #ffffff;
+			}
+		}
+		
+		/* Loading spinner for better UX */
+		.loading-container {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			background-color: #f8f9fa;
+			z-index: 9999;
+		}
+		
+		.loading-spinner {
+			width: 40px;
+			height: 40px;
+			border: 4px solid #f3f3f3;
+			border-top: 4px solid #ff6d5a;
+			border-radius: 50%;
+			animation: spin 1s linear infinite;
+		}
+		
+		@keyframes spin {
+			0% { transform: rotate(0deg); }
+			100% { transform: rotate(360deg); }
+		}
+		
+		@media (prefers-color-scheme: dark) {
+			.loading-container {
+				background-color: rgb(45, 46, 46);
+			}
+		}
+		</style>
+		
+		<link rel="stylesheet" href="/{{BASE_PATH}}/static/prefers-color-scheme.css" media="print" onload="this.media='all'">
 		<script src="/{{BASE_PATH}}/static/base-path.js" type="text/javascript"></script>
-		<script src="/{{BASE_PATH}}/static/posthog.init.js" type="text/javascript"></script>
+		<script src="/{{BASE_PATH}}/static/posthog.init.js" type="text/javascript" defer></script>
 
-		<title>n8n.io - Workflow Automation</title>
+		<title>n8n.io - Workflow Automation Platform</title>
 	</head>
 	<body>
 		<noscript>
@@ -19,7 +94,32 @@
 				enable it to continue.</strong
 			>
 		</noscript>
+		<div id="loading" class="loading-container">
+			<div class="loading-spinner"></div>
+		</div>
 		<div id="app"></div>
 		<script type="module" src="/src/main.ts"></script>
+		<script>
+			// Hide loading spinner when app loads
+			window.addEventListener('load', () => {
+				setTimeout(() => {
+					const loading = document.getElementById('loading');
+					if (loading) loading.style.display = 'none';
+				}, 1000);
+				
+				// Register service worker for performance caching
+				if ('serviceWorker' in navigator) {
+					window.addEventListener('load', () => {
+						navigator.serviceWorker.register('/sw.js')
+							.then((registration) => {
+								console.log('SW registered: ', registration);
+							})
+							.catch((registrationError) => {
+								console.log('SW registration failed: ', registrationError);
+							});
+					});
+				}
+			});
+		</script>
 	</body>
 </html>

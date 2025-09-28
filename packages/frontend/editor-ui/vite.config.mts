@@ -193,11 +193,33 @@ export default mergeConfig(
 					].join('\n'),
 				},
 			},
+			// Enable CSS code splitting for better performance
+			devSourcemap: NODE_ENV === 'development',
 		},
 		build: {
 			minify: !!release,
 			sourcemap: !!release,
 			target,
+			rollupOptions: {
+				output: {
+					manualChunks: {
+						// Vendor libraries - hanya yang pasti ada
+						'vendor-core': ['vue', 'pinia', 'vue-router'],
+						'vendor-utils': ['lodash'],
+						// N8N specific chunks
+						'n8n-design': ['@n8n/design-system'],
+					},
+					// Optimize chunk file names for caching
+					chunkFileNames: (chunkInfo) => {
+						const facadeModuleId = chunkInfo.facadeModuleId
+							? chunkInfo.facadeModuleId.split('/').pop()?.replace('.vue', '')
+							: 'chunk';
+						return `assets/${facadeModuleId}-[hash].js`;
+					},
+				},
+			},
+			// Increase chunk size warning limit
+			chunkSizeWarningLimit: 1000,
 		},
 		optimizeDeps: {
 			esbuildOptions: {
